@@ -4,7 +4,12 @@ import (
 	"encoding/csv"
 	"io"
 	"log"
+	"net"
 	"os"
+
+	"golang.org/x/net/dns/dnsmessage"
+	"github.com/google/gopacket"
+	layers "github.com/google/gopacket/layers"
 )
 
 //DNSEntry - a struct that defines the way DNS entries work
@@ -19,9 +24,54 @@ type DNSEntry struct {
 //DNSentries an array that holds all registered DNS entries as DNSEntry structs
 var DNSentries []DNSEntry
 
+var server *net.UDPConn
+
 //Out main function. This is where it all starts
 func main() {
 	loadCSV("dns.csv")
+	var err error
+	server, err = net.ListenUDP("udp", &net.UDPAddr{Port: 8053})
+
+	if err != nil {
+		log.Fatalf("Error resolving UDP address: %s", err.Error())
+		os.Exit(1)
+	}
+
+	defer server.Close()
+
+	for {
+		buf := make([]byte, 512)
+		_, addr, err := server.ReadFromUDP(buf)
+		if err != nil {
+			log.Printf("Error reading UDP request: %s", err.Error())
+			continue
+		}
+		var message dnsmessage.Message
+		err = message.Unpack(buf)
+		if err != nil {
+			log.Printf("Invalid DNS request: %s", err.Error())
+		}
+		// Skip this loop if there are no queries
+		if len(message.Questions) == 0 {
+			continue
+		}
+		// handle the clients request in a thread
+		go handleQuery(message)
+	}
+}
+
+// handleQuery - parse DNS requests and answer them
+func handleQuery(message dnsmessage.Message) {
+	for _, request := range message.Questions {
+		recordname := request.Name
+		recordtype := request.Type
+		log.Println(recordname)
+		log.Println(recordtype)
+		var dnsAnswer layers.DNSResourceRecord
+		dnsAnswer.Type = layers.DNSTypeA
+
+		go server.WriteToUDP(b []byte, addr *net.UDPAddr)
+	}
 
 }
 
