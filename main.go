@@ -2,13 +2,15 @@ package main
 
 import (
 	"encoding/csv"
+	"fmt"
 	"io"
 	"log"
 	"net"
 	"os"
+	"os/signal"
+	"syscall"
 
-	"github.com/google/gopacket"
-	layers "github.com/google/gopacket/layers"
+	"github.com/miekg/dns"
 )
 
 //DNSEntry - a struct that defines the way DNS entries work
@@ -23,65 +25,52 @@ type DNSEntry struct {
 //DNSentries an array that holds all registered DNS entries as DNSEntry structs
 var DNSentries []DNSEntry
 
-var server *net.UDPConn
+const dom = "whoami.miek.nl."
 
 //Out main function. This is where it all starts
 func main() {
 	loadCSV("dns.csv")
-	var err error
-	server, err = net.ListenUDP("udp", &net.UDPAddr{Port: 8053})
+	dns.HandleFunc(".", handleQuery)
 
-	if err != nil {
-		log.Fatalf("Error resolving UDP address: %s", err.Error())
-		os.Exit(1)
-	}
-
-	defer server.Close()
-
-	for {
-		buf := make([]byte, 512)
-		_, clientAddr, err := server.ReadFromUDP(buf)
+	go func() {
+		server := &dns.Server{Addr: ":8053", Net: "udp"}
+		err := server.ListenAndServe()
 		if err != nil {
-			log.Printf("Error reading UDP data: %s", err.Error())
-			continue
+			log.Fatalf("Could not setup udp listender %s", err.Error())
 		}
-		packet := gopacket.NewPacket(buf, layers.LayerTypeDNS, gopacket.Default)
-		dnsPacket := packet.Layer(layers.LayerTypeDNS)
-		request, _ := dnsPacket.(*layers.DNS)
+	}()
 
-		// handle the clients request in a thread
-		go handleQuery(server, clientAddr, request)
-	}
+	sig := make(chan os.Signal)
+	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
+	s := <-sig
+	fmt.Printf("Signal (%s) received, stopping\n", s)
 }
 
 // handleQuery - parse DNS requests and answer them
-func handleQuery(server *net.UDPConn, clientAddr net.Addr, request *layers.DNS) {
-	for i, question := range request.Questions {
-		var answer layers.DNSResourceRecord
-		answer.Type = layers.DNSTypeA
-		answer.Name = []byte(question.Name)
-		ip, _, err := net.ParseCIDR("192.168.0.1/24")
-		if err != nil {
-			log.Println("Error converting the stored IP")
+func handleQuery(writer dns.ResponseWriter, request *dns.Msg) {
+	message := new(dns.Msg)
+	message.SetReply(request)
+	message.Compress = true
+	for _, question := range request.Question {
+		switch question.Qtype {
+		case dns.TypeTXT:
+			record := &dns.TXT{
+				Hdr: dns.RR_Header{Name: dom, Rrtype: dns.TypeTXT, Class: dns.ClassINET, Ttl: 0},
+				Txt: []string{"blabla"},
+			}
+			message.Answer = append(message.Answer, record)
+		case dns.TypeA:
+			record := &dns.A{
+				Hdr: dns.RR_Header{Name: dom, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: 0},
+				A:   net.IPv4(127, 0, 0, 1),
+			}
+			message.Answer = append(message.Answer, record)
+		default:
+			message.SetRcode(request, dns.RcodeNameError)
+
 		}
-		answer.IP = ip
-		answer.Class = layers.DNSClassIN
-		request.QR = true
-		request.ANCount = uint16(i)
-		request.OpCode = layers.DNSOpCodeNotify
-		request.AA = true
-		request.Answers = append(request.Answers, answer)
-		request.ResponseCode = layers.DNSResponseCodeNoErr
-
 	}
-	buf := gopacket.NewSerializeBuffer()
-	opt := gopacket.SerializeOptions{}
-	err := request.SerializeTo(buf, opt)
-	if err != nil {
-		log.Printf("Error serializing answers %s", err.Error())
-	}
-	server.WriteTo(buf.Bytes(), clientAddr)
-
+	writer.WriteMsg(message)
 }
 
 //loadCSV - this functions loads all dns entries from a file identified by the given filename
