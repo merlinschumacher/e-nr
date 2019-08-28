@@ -8,22 +8,26 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"regexp"
+	"sort"
+	"strconv"
+	"strings"
 	"syscall"
 
 	"github.com/miekg/dns"
 )
 
 //DNSEntry - a struct that defines the way DNS entries work
-type DNSEntry struct {
-	Shortname   string
+type DNSRecord struct {
+	ID          int
 	Fullname    string
 	URL         string
 	Description string
 	Dosage      string
 }
 
-//DNSentries an array that holds all registered DNS entries as DNSEntry structs
-var DNSentries []DNSEntry
+//DNSentries - an array that holds all registered DNS entries as DNSEntry structs
+var DNSRecords []DNSRecord
 
 const dom = "whoami.miek.nl."
 
@@ -52,11 +56,12 @@ func handleQuery(writer dns.ResponseWriter, request *dns.Msg) {
 	message.SetReply(request)
 	message.Compress = true
 	for _, question := range request.Question {
+		recordData := findRecordDataByName(question.Name)
 		switch question.Qtype {
 		case dns.TypeTXT:
 			record := &dns.TXT{
 				Hdr: dns.RR_Header{Name: dom, Rrtype: dns.TypeTXT, Class: dns.ClassINET, Ttl: 0},
-				Txt: []string{"blabla"},
+				Txt: []string{recordData.Fullname, recordData.Description, recordData.URL},
 			}
 			message.Answer = append(message.Answer, record)
 		case dns.TypeA:
@@ -71,6 +76,29 @@ func handleQuery(writer dns.ResponseWriter, request *dns.Msg) {
 		}
 	}
 	writer.WriteMsg(message)
+}
+
+func findRecordDataByName(name string) DNSRecord {
+	isNumber := true
+	numberRegex := regexp.MustCompile(`\d{3,4}`)
+	numberStr := numberRegex.FindString(name)
+	number, err := strconv.Atoi(string(numberStr))
+	if err != nil || number == 0 {
+		isNumber = false
+	}
+	for _, record := range DNSRecords {
+		if isNumber {
+			if record.ID == number {
+				return record
+			}
+		} else {
+			if strings.Contains(record.Fullname, name) {
+				return record
+			}
+		}
+	}
+	var emptyRecord DNSRecord
+	return emptyRecord
 }
 
 //loadCSV - this functions loads all dns entries from a file identified by the given filename
@@ -93,14 +121,22 @@ func loadCSV(filename string) {
 			log.Fatal(err)
 		}
 		//create a temporary DNS entry and fill it with the loaded data
-		var tmpDNSEntry DNSEntry
-		tmpDNSEntry.Shortname = row[0]
-		tmpDNSEntry.Fullname = row[1]
-		tmpDNSEntry.URL = row[2]
-		tmpDNSEntry.Description = row[3]
-		tmpDNSEntry.Dosage = row[4]
+		var tmpDNSRecord DNSRecord
+		tmpDNSRecord.ID, err = strconv.Atoi(row[0])
+		if err != nil {
+			tmpDNSRecord.ID = 0
+		}
+		tmpDNSRecord.Fullname = row[1]
+		tmpDNSRecord.URL = row[2]
+		tmpDNSRecord.Description = row[3]
+		tmpDNSRecord.Dosage = row[4]
 
 		// append the temporary entry to our entries
-		DNSentries = append(DNSentries, tmpDNSEntry)
+		DNSRecords = append(DNSRecords, tmpDNSRecord)
+
+		sort.Slice(DNSRecords, func(i, j int) bool {
+			return DNSRecords[i].ID < DNSRecords[j].ID
+		})
+
 	}
 }
