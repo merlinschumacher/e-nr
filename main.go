@@ -7,7 +7,6 @@ import (
 	"net"
 	"os"
 
-	"golang.org/x/net/dns/dnsmessage"
 	"github.com/google/gopacket"
 	layers "github.com/google/gopacket/layers"
 )
@@ -41,37 +40,47 @@ func main() {
 
 	for {
 		buf := make([]byte, 512)
-		_, addr, err := server.ReadFromUDP(buf)
+		_, clientAddr, err := server.ReadFromUDP(buf)
 		if err != nil {
-			log.Printf("Error reading UDP request: %s", err.Error())
+			log.Printf("Error reading UDP data: %s", err.Error())
 			continue
 		}
-		var message dnsmessage.Message
-		err = message.Unpack(buf)
-		if err != nil {
-			log.Printf("Invalid DNS request: %s", err.Error())
-		}
-		// Skip this loop if there are no queries
-		if len(message.Questions) == 0 {
-			continue
-		}
+		packet := gopacket.NewPacket(buf, layers.LayerTypeDNS, gopacket.Default)
+		dnsPacket := packet.Layer(layers.LayerTypeDNS)
+		request, _ := dnsPacket.(*layers.DNS)
+
 		// handle the clients request in a thread
-		go handleQuery(message)
+		go handleQuery(server, clientAddr, request)
 	}
 }
 
 // handleQuery - parse DNS requests and answer them
-func handleQuery(message dnsmessage.Message) {
-	for _, request := range message.Questions {
-		recordname := request.Name
-		recordtype := request.Type
-		log.Println(recordname)
-		log.Println(recordtype)
-		var dnsAnswer layers.DNSResourceRecord
-		dnsAnswer.Type = layers.DNSTypeA
+func handleQuery(server *net.UDPConn, clientAddr net.Addr, request *layers.DNS) {
+	for i, question := range request.Questions {
+		var answer layers.DNSResourceRecord
+		answer.Type = layers.DNSTypeA
+		answer.Name = []byte(question.Name)
+		ip, _, err := net.ParseCIDR("192.168.0.1/24")
+		if err != nil {
+			log.Println("Error converting the stored IP")
+		}
+		answer.IP = ip
+		answer.Class = layers.DNSClassIN
+		request.QR = true
+		request.ANCount = uint16(i)
+		request.OpCode = layers.DNSOpCodeNotify
+		request.AA = true
+		request.Answers = append(request.Answers, answer)
+		request.ResponseCode = layers.DNSResponseCodeNoErr
 
-		go server.WriteToUDP(b []byte, addr *net.UDPAddr)
 	}
+	buf := gopacket.NewSerializeBuffer()
+	opt := gopacket.SerializeOptions{}
+	err := request.SerializeTo(buf, opt)
+	if err != nil {
+		log.Printf("Error serializing answers %s", err.Error())
+	}
+	server.WriteTo(buf.Bytes(), clientAddr)
 
 }
 
