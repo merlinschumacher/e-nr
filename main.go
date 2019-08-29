@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/csv"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -15,9 +16,10 @@ import (
 	"syscall"
 
 	"github.com/miekg/dns"
+	"golang.org/x/net/idna"
 )
 
-//DNSEntry - a struct that defines the way DNS entries work
+//DNSRecord a struct that defines the way DNS entries work
 type DNSRecord struct {
 	ID          int
 	Fullname    string
@@ -26,12 +28,13 @@ type DNSRecord struct {
 	Dosage      string
 }
 
-//DNSentries - an array that holds all registered DNS entries as DNSEntry structs
+//DNSRecords an array that holds all registered DNS entries as DNSEntry structs
 var DNSRecords []DNSRecord
 
-const dom = "whoami.miek.nl."
+//global base domain
+var baseDomain = ".e-nr.de."
 
-//Out main function. This is where it all starts
+//Our main function. This is where it all starts
 func main() {
 	loadCSV("dns.csv")
 	dns.HandleFunc(".", handleQuery)
@@ -52,53 +55,112 @@ func main() {
 
 // handleQuery - parse DNS requests and answer them
 func handleQuery(writer dns.ResponseWriter, request *dns.Msg) {
-	message := new(dns.Msg)
-	message.SetReply(request)
-	message.Compress = true
-	for _, question := range request.Question {
-		recordData := findRecordDataByName(question.Name)
-		switch question.Qtype {
-		case dns.TypeTXT:
-			record := &dns.TXT{
-				Hdr: dns.RR_Header{Name: dom, Rrtype: dns.TypeTXT, Class: dns.ClassINET, Ttl: 0},
-				Txt: []string{recordData.Fullname, recordData.Description, recordData.URL},
-			}
-			message.Answer = append(message.Answer, record)
-		case dns.TypeA:
-			record := &dns.A{
-				Hdr: dns.RR_Header{Name: dom, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: 0},
-				A:   net.IPv4(127, 0, 0, 1),
-			}
-			message.Answer = append(message.Answer, record)
-		default:
-			message.SetRcode(request, dns.RcodeNameError)
+	var recordData DNSRecord
+	var message *dns.Msg
 
+	for _, question := range request.Question {
+		var err error
+		recordData, err = findRecordDataByName(question.Name)
+		if err != nil {
+			message = buildResourceRecord(0, request, recordData)
+		} else {
+			message = buildResourceRecord(question.Qtype, request, recordData)
 		}
 	}
 	writer.WriteMsg(message)
 }
 
-func findRecordDataByName(name string) DNSRecord {
+func buildResourceRecord(queryType uint16, request *dns.Msg, recordData DNSRecord) *dns.Msg {
+
+	message := new(dns.Msg)
+	message.SetReply(request)
+	message.Compress = true
+	log.Println(queryType)
+	switch queryType {
+	case dns.TypeTXT:
+		dom := recordData.Fullname + baseDomain
+		record := &dns.TXT{
+			Hdr: dns.RR_Header{Name: dom, Rrtype: dns.TypeTXT, Class: dns.ClassINET, Ttl: 0},
+			Txt: []string{recordData.Fullname, recordData.Description, recordData.URL},
+		}
+		message.Answer = append(message.Answer, record)
+		return message
+	case dns.TypeA:
+		strID := strconv.Itoa(recordData.ID)
+		cnames := []string{recordData.Fullname, strID, "e" + strID, "e-" + strID}
+		for _, cname := range cnames {
+			dom := cname + baseDomain
+			record := &dns.A{
+				Hdr: dns.RR_Header{Name: dom, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: 0},
+				A:   net.IPv4(127, 0, 0, 1),
+			}
+			message.Answer = append(message.Answer, record)
+		}
+		return message
+	case dns.TypeCNAME:
+		strID := strconv.Itoa(recordData.ID)
+		cnames := []string{recordData.Fullname, strID, "e" + strID, "e-" + strID}
+		for _, cname := range cnames {
+			dom := cname + baseDomain
+			record := &dns.CNAME{
+				Hdr:    dns.RR_Header{Name: dom, Rrtype: dns.TypeCNAME, Class: dns.ClassINET, Ttl: 0},
+				Target: dom,
+			}
+			message.Answer = append(message.Answer, record)
+		}
+		return message
+	default:
+		log.Print("default")
+		dom := "ns" + baseDomain
+		record := &dns.SOA{
+			Hdr: dns.RR_Header{Name: dom, Rrtype: dns.TypeCNAME, Class: dns.ClassINET, Ttl: 0},
+			Ns:  dom,
+		}
+		message.Answer = append(message.Answer, record)
+		return message
+	}
+}
+
+func findRecordDataByName(search string) (DNSRecord, error) {
+	var lcSearch string
+	var emptyRecord DNSRecord
+	emptyRecord.ID = -1
 	isNumber := true
+
+	//parse the given
 	numberRegex := regexp.MustCompile(`\d{3,4}`)
-	numberStr := numberRegex.FindString(name)
+	numberStr := numberRegex.FindString(search)
+
+	//check if the searched record is a number
 	number, err := strconv.Atoi(string(numberStr))
 	if err != nil || number == 0 {
 		isNumber = false
+		lcSearch = strings.ToLower(search)
+		lcSearch = strings.ReplaceAll(lcSearch, ".", "")
 	}
 	for _, record := range DNSRecords {
+		//dns records should be lowercase and be converted to ASCII/Punycode if necessary
+		record.Fullname = strings.ToLower(record.Fullname)
+		record.Fullname, err = idna.ToASCII(record.Fullname)
+		if err != nil {
+			log.Printf("Failed to convert to punycode: %s %s", record.Fullname, err.Error())
+			return emptyRecord, err
+		}
 		if isNumber {
 			if record.ID == number {
-				return record
+				return record, nil
 			}
 		} else {
-			if strings.Contains(record.Fullname, name) {
-				return record
+			if strings.Contains(lcSearch, record.Fullname) {
+				if err != nil {
+					log.Println(err)
+					return record, errors.New("No record founrd for: " + search)
+				}
+				return record, nil
 			}
 		}
 	}
-	var emptyRecord DNSRecord
-	return emptyRecord
+	return emptyRecord, errors.New("General failure in search")
 }
 
 //loadCSV - this functions loads all dns entries from a file identified by the given filename
