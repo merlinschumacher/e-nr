@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"net"
+	"net/url"
 	"os"
 	"os/signal"
 	"regexp"
@@ -75,19 +76,20 @@ func buildResourceRecord(queryType uint16, request *dns.Msg, recordData DNSRecor
 	message := new(dns.Msg)
 	message.SetReply(request)
 	message.Compress = true
-	log.Println(queryType)
+	strID := strconv.Itoa(recordData.ID)
+	cnames := []string{recordData.Fullname, strID, "e" + strID, "e-" + strID}
 	switch queryType {
 	case dns.TypeTXT:
 		dom := recordData.Fullname + baseDomain
+		description, _ := idna.ToASCII(recordData.Fullname)
 		record := &dns.TXT{
 			Hdr: dns.RR_Header{Name: dom, Rrtype: dns.TypeTXT, Class: dns.ClassINET, Ttl: 0},
-			Txt: []string{recordData.Fullname, recordData.Description, recordData.URL},
+			// Txt: []string{recordData.Fullname, recordData.Description, recordData.URL},
+			Txt: []string{description},
 		}
 		message.Answer = append(message.Answer, record)
 		return message
 	case dns.TypeA:
-		strID := strconv.Itoa(recordData.ID)
-		cnames := []string{recordData.Fullname, strID, "e" + strID, "e-" + strID}
 		for _, cname := range cnames {
 			dom := cname + baseDomain
 			record := &dns.A{
@@ -98,8 +100,6 @@ func buildResourceRecord(queryType uint16, request *dns.Msg, recordData DNSRecor
 		}
 		return message
 	case dns.TypeCNAME:
-		strID := strconv.Itoa(recordData.ID)
-		cnames := []string{recordData.Fullname, strID, "e" + strID, "e-" + strID}
 		for _, cname := range cnames {
 			dom := cname + baseDomain
 			record := &dns.CNAME{
@@ -109,20 +109,31 @@ func buildResourceRecord(queryType uint16, request *dns.Msg, recordData DNSRecor
 			message.Answer = append(message.Answer, record)
 		}
 		return message
+	case dns.TypeURI:
+		for _, cname := range cnames {
+			dom := cname + baseDomain
+			record := &dns.URI{
+				Hdr:    dns.RR_Header{Name: dom, Rrtype: dns.TypeURI, Class: dns.ClassINET, Ttl: 0},
+				Target: recordData.URL,
+			}
+			message.Answer = append(message.Answer, record)
+		}
+		return message
 	default:
-		log.Print("default")
+		log.Printf("defaulting to NXDOMAIN for request\n %s", request.Question[0].String())
 		dom := "ns" + baseDomain
 		record := &dns.SOA{
-			Hdr: dns.RR_Header{Name: dom, Rrtype: dns.TypeCNAME, Class: dns.ClassINET, Ttl: 0},
+			Hdr: dns.RR_Header{Name: dom, Rrtype: dns.TypeSOA, Class: dns.ClassINET, Ttl: 0},
 			Ns:  dom,
 		}
+
+		message.SetRcode(request, dns.RcodeNameError)
 		message.Answer = append(message.Answer, record)
 		return message
 	}
 }
 
 func findRecordDataByName(search string) (DNSRecord, error) {
-	var lcSearch string
 	var emptyRecord DNSRecord
 	emptyRecord.ID = -1
 	isNumber := true
@@ -135,15 +146,15 @@ func findRecordDataByName(search string) (DNSRecord, error) {
 	number, err := strconv.Atoi(string(numberStr))
 	if err != nil || number == 0 {
 		isNumber = false
-		lcSearch = strings.ToLower(search)
-		lcSearch = strings.ReplaceAll(lcSearch, ".", "")
+		search = strings.ToLower(search)
+		search = strings.ReplaceAll(search, ".", "")
 	}
 	for _, record := range DNSRecords {
 		//dns records should be lowercase and be converted to ASCII/Punycode if necessary
 		record.Fullname = strings.ToLower(record.Fullname)
 		record.Fullname, err = idna.ToASCII(record.Fullname)
 		if err != nil {
-			log.Printf("Failed to convert to punycode: %s %s", record.Fullname, err.Error())
+			log.Panicf("Failed to convert to punycode: %s %s", record.Fullname, err.Error())
 			return emptyRecord, err
 		}
 		if isNumber {
@@ -151,16 +162,12 @@ func findRecordDataByName(search string) (DNSRecord, error) {
 				return record, nil
 			}
 		} else {
-			if strings.Contains(lcSearch, record.Fullname) {
-				if err != nil {
-					log.Println(err)
-					return record, errors.New("No record founrd for: " + search)
-				}
+			if strings.Contains(search, record.Fullname) {
 				return record, nil
 			}
 		}
 	}
-	return emptyRecord, errors.New("General failure in search")
+	return emptyRecord, errors.New("No record found for: " + search)
 }
 
 //loadCSV - this functions loads all dns entries from a file identified by the given filename
@@ -189,7 +196,7 @@ func loadCSV(filename string) {
 			tmpDNSRecord.ID = 0
 		}
 		tmpDNSRecord.Fullname = row[1]
-		tmpDNSRecord.URL = row[2]
+		tmpDNSRecord.URL = sanitizeURL(row[2], "/wiki/")
 		tmpDNSRecord.Description = row[3]
 		tmpDNSRecord.Dosage = row[4]
 
@@ -201,4 +208,16 @@ func loadCSV(filename string) {
 		})
 
 	}
+}
+
+func sanitizeURL(link string, prefix string) string {
+	baseURL, err := url.Parse(link)
+	if err != nil {
+		return ""
+	}
+	baseURL.Path = strings.ReplaceAll(baseURL.Path, prefix, "")
+	log.Println(baseURL.Path)
+	baseURL.Path = prefix + url.PathEscape(baseURL.Path)
+	log.Println(baseURL.Path)
+	return baseURL.String()
 }
