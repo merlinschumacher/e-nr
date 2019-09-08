@@ -214,7 +214,6 @@ func loadCSV(filename string) {
 func sanitizeURL(link string, prefix string) string {
 	shortenedLink := strings.ReplaceAll(link, prefix, "")
 	baseURL, err := url.Parse(shortenedLink)
-	log.Println(baseURL)
 	if err != nil {
 		return ""
 	}
