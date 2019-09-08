@@ -112,6 +112,7 @@ func buildResourceRecord(queryType uint16, request *dns.Msg, recordData DNSRecor
 	case dns.TypeURI:
 		for _, cname := range cnames {
 			dom := cname + baseDomain
+			log.Println(recordData.URL)
 			record := &dns.URI{
 				Hdr:    dns.RR_Header{Name: dom, Rrtype: dns.TypeURI, Class: dns.ClassINET, Ttl: 0},
 				Target: recordData.URL,
@@ -196,7 +197,7 @@ func loadCSV(filename string) {
 			tmpDNSRecord.ID = 0
 		}
 		tmpDNSRecord.Fullname = row[1]
-		tmpDNSRecord.URL = sanitizeURL(row[2], "/wiki/")
+		tmpDNSRecord.URL = sanitizeURL(row[2], "https://de.wikipedia.org/wiki/")
 		tmpDNSRecord.Description = row[3]
 		tmpDNSRecord.Dosage = row[4]
 
@@ -211,13 +212,12 @@ func loadCSV(filename string) {
 }
 
 func sanitizeURL(link string, prefix string) string {
-	baseURL, err := url.Parse(link)
+	shortenedLink := strings.ReplaceAll(link, prefix, "")
+	baseURL, err := url.Parse(shortenedLink)
+	log.Println(baseURL)
 	if err != nil {
 		return ""
 	}
-	baseURL.Path = strings.ReplaceAll(baseURL.Path, prefix, "")
-	log.Println(baseURL.Path)
 	baseURL.Path = prefix + url.PathEscape(baseURL.Path)
-	log.Println(baseURL.Path)
 	return baseURL.String()
 }
