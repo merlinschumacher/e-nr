@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"net"
+	"net/http"
 	"net/url"
 	"os"
 	"os/signal"
@@ -45,6 +46,14 @@ func main() {
 		err := server.ListenAndServe()
 		if err != nil {
 			log.Fatalf("Could not setup udp listender %s", err.Error())
+		}
+	}()
+
+	go func() {
+		http.HandleFunc("/", handleHTTP)
+		err := http.ListenAndServe(":9090", nil)
+		if err != nil {
+			log.Fatal("ListenAndServe: ", err)
 		}
 	}()
 
@@ -112,7 +121,6 @@ func buildResourceRecord(queryType uint16, request *dns.Msg, recordData DNSRecor
 	case dns.TypeURI:
 		for _, cname := range cnames {
 			dom := cname + baseDomain
-			log.Println(recordData.URL)
 			record := &dns.URI{
 				Hdr:    dns.RR_Header{Name: dom, Rrtype: dns.TypeURI, Class: dns.ClassINET, Ttl: 0},
 				Target: recordData.URL,
@@ -138,6 +146,7 @@ func findRecordDataByName(search string) (DNSRecord, error) {
 	var emptyRecord DNSRecord
 	emptyRecord.ID = -1
 	isNumber := true
+	search, _ = idna.ToUnicode(search)
 
 	//parse the given
 	numberRegex := regexp.MustCompile(`\d{3,4}`)
@@ -153,17 +162,15 @@ func findRecordDataByName(search string) (DNSRecord, error) {
 	for _, record := range DNSRecords {
 		//dns records should be lowercase and be converted to ASCII/Punycode if necessary
 		record.Fullname = strings.ToLower(record.Fullname)
-		record.Fullname, err = idna.ToASCII(record.Fullname)
-		if err != nil {
-			log.Panicf("Failed to convert to punycode: %s %s", record.Fullname, err.Error())
-			return emptyRecord, err
-		}
 		if isNumber {
 			if record.ID == number {
+
+				record.Fullname, err = idna.ToASCII(record.Fullname)
 				return record, nil
 			}
 		} else {
 			if strings.Contains(search, record.Fullname) {
+				record.Fullname, err = idna.ToASCII(record.Fullname)
 				return record, nil
 			}
 		}
@@ -218,5 +225,24 @@ func sanitizeURL(link string, prefix string) string {
 		return ""
 	}
 	baseURL.Path = prefix + url.PathEscape(baseURL.Path)
-	return baseURL.String()
+	return baseURL.Path
+}
+
+func handleHTTP(responseWriter http.ResponseWriter, request *http.Request) {
+	hostname := strings.Split(request.Host, ".")[0]
+	var record DNSRecord
+	var err error
+	path := strings.ReplaceAll(request.URL.Path, "/", "")
+	// path, _ = idna.ToASCII(path)
+	if path != "" {
+		record, err = findRecordDataByName(path)
+		log.Println(record)
+	} else {
+		record, err = findRecordDataByName(hostname)
+	}
+	if err != nil || record.ID == -1 {
+		http.ServeFile(responseWriter, request, "index.html")
+		return
+	}
+	http.Redirect(responseWriter, request, record.URL, 301)
 }
