@@ -1,10 +1,10 @@
 module github.com/merlinschumacher/csv-dns
 
-go 1.12
+go 1.13
 
 require (
-	github.com/google/gopacket v1.1.17
-	github.com/miekg/dns v1.1.16
-	golang.org/x/net v0.0.0-20190404232315-eb5bcb51f2a3
+	github.com/google/gopacket v1.1.18
+	github.com/miekg/dns v1.1.31
+	golang.org/x/net v0.0.0-20190923162816-aa69164e4478
 	golang.org/x/text v0.3.0
 )

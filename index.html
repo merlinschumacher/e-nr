@@ -1,0 +1,202 @@
+<!doctype html>
+
+<html lang="de">
+
+<head>
+    <meta charset="utf-8">
+    <title>e-nr.de</title>
+    <meta name="description" content="e-nr.de – E-Nummern und Inhaltsstoffe einfach abfragen">
+    <meta name="author" content="Merlin Schumacher">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        html,
+        body,
+        div,
+        span,
+        applet,
+        object,
+        iframe,
+        h1,
+        h2,
+        h3,
+        h4,
+        h5,
+        h6,
+        p,
+        blockquote,
+        pre,
+        a,
+        abbr,
+        acronym,
+        address,
+        big,
+        cite,
+        code,
+        del,
+        dfn,
+        em,
+        img,
+        ins,
+        kbd,
+        q,
+        s,
+        samp,
+        small,
+        strike,
+        strong,
+        sub,
+        sup,
+        tt,
+        var,
+        b,
+        u,
+        i,
+        center,
+        dl,
+        dt,
+        dd,
+        ol,
+        ul,
+        li,
+        fieldset,
+        form,
+        label,
+        legend,
+        table,
+        caption,
+        tbody,
+        tfoot,
+        thead,
+        tr,
+        th,
+        td,
+        article,
+        aside,
+        canvas,
+        details,
+        embed,
+        figure,
+        figcaption,
+        footer,
+        header,
+        hgroup,
+        menu,
+        nav,
+        output,
+        ruby,
+        section,
+        summary,
+        time,
+        mark,
+        audio,
+        video {
+            margin: 0;
+            padding: 0;
+            border: 0;
+            font-size: 100%;
+            font: inherit;
+            vertical-align: baseline;
+        }
+
+        /* HTML5 display-role reset for older browsers */
+        article,
+        aside,
+        details,
+        figcaption,
+        figure,
+        footer,
+        header,
+        hgroup,
+        menu,
+        nav,
+        section {
+            display: block;
+        }
+
+        body {
+            line-height: 1;
+        }
+
+        ol,
+        ul {
+            list-style: none;
+        }
+
+        blockquote,
+        q {
+            quotes: none;
+        }
+
+        blockquote:before,
+        blockquote:after,
+        q:before,
+        q:after {
+            content: '';
+            content: none;
+        }
+
+        table {
+            border-collapse: collapse;
+            border-spacing: 0;
+        }
+
+        html {
+            font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+        }
+
+        #wrapper {
+            width: 80%;
+            max-width: 600px;
+            margin: 0 auto;
+            position: relative;
+            padding: 1rem;
+        }
+
+        h1 {
+            font-size: 2rem;
+            font-weight: bold;
+            margin-bottom: .75em;
+        }
+
+        h2 {
+            font-size: 1.6rem;
+            font-weight: bold;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="wrapper">
+        <h1>e-nr.de</h1>
+        <h2>E-Nummern und Inhaltsstoffe einfach abfragen.</h2>
+        <p>
+            Mit dieser Seite können Sie einfach die Bedeutung von <a
+                href="https://de.wikipedia.org/wiki/Lebensmittelzusatzstoff" target="_blank">E-Nummern</a> in den
+            Inhaltsstoffen von Produkten ermitteln.
+            Besuchen Sie zum Beispiel <a href="https://300.e-nr.de" target="_blank">300.e-nr.de</a> um zu erfahren, was
+            sich
+            hinter E300 verbirgt. Alternativ können Sie auch <a
+                href="https://kaliumacetat.e-nr.de">kaliumacetat.e-nr.de</a>
+            besuchen um Anhand des Namens mehr über den Inhaltsstoff zu erfahren.
+            Alle Links führen direkt zum entsprechenden Artikel der deutschsprachigen Wikipedia.
+        </p>
+
+        <h3>Spaß für Nerds mit DNS</h3>
+        <p>
+            Für technikinteressierte Nutzer stellt diese Seite auch einen DNS-Dienst bereit über den man die Bedeutung
+            der E-Nummern direkt abrufen kann. Mit dem Kommando dig lassen sich Einträge wie folgt abfragen:
+
+            <code><pre>dig 100.e-nr.de</pre></code>
+
+            Der Dienst liefert A-, AAAA-, CNAME-, URI- und TXT-Records aus. A und AAAA geben lediglich die IP des
+            Servers und die alternativen Namen der E-Nummer aus. CNAME gibt ebenfalls die alternativen Namen aus. Der
+            URI-Eintrag gibt den Link zum Wikipedia-Artikel aus. Der TXT-Eintrag enthält den vollen Namen, die
+            Beschreibung und die Wikipedia-URL.
+
+        </p>
+        © Merlin Schumacher – <a href="https://github.com/merlinschumacher/csv-dns" target="_blank">Quellcode auf
+            GitHub</a>
+    </div>
+</body>
+
+</html>

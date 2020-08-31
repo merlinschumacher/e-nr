@@ -16,9 +16,13 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"unicode"
 
 	"github.com/miekg/dns"
 	"golang.org/x/net/idna"
+	"golang.org/x/text/runes"
+	"golang.org/x/text/transform"
+	"golang.org/x/text/unicode/norm"
 )
 
 //DNSRecord a struct that defines the way DNS entries work
@@ -80,8 +84,8 @@ func handleQuery(writer dns.ResponseWriter, request *dns.Msg) {
 	writer.WriteMsg(message)
 }
 
+// create a Resource Record for the users request and return it, if it exists.
 func buildResourceRecord(queryType uint16, request *dns.Msg, recordData DNSRecord) *dns.Msg {
-
 	message := new(dns.Msg)
 	message.SetReply(request)
 	message.Compress = true
@@ -90,11 +94,11 @@ func buildResourceRecord(queryType uint16, request *dns.Msg, recordData DNSRecor
 	switch queryType {
 	case dns.TypeTXT:
 		dom := recordData.Fullname + baseDomain
-		description, _ := idna.ToASCII(recordData.Fullname)
+		t := transform.Chain(norm.NFD, runes.Remove(runes.In(unicode.Mn)), norm.NFC)
+		saneDesc, _, _ := transform.String(t, recordData.Description)
 		record := &dns.TXT{
 			Hdr: dns.RR_Header{Name: dom, Rrtype: dns.TypeTXT, Class: dns.ClassINET, Ttl: 0},
-			// Txt: []string{recordData.Fullname, recordData.Description, recordData.URL},
-			Txt: []string{description},
+			Txt: []string{recordData.Fullname, saneDesc, recordData.URL},
 		}
 		message.Answer = append(message.Answer, record)
 		return message
@@ -106,6 +110,18 @@ func buildResourceRecord(queryType uint16, request *dns.Msg, recordData DNSRecor
 				A:   net.IPv4(127, 0, 0, 1),
 			}
 			message.Answer = append(message.Answer, record)
+
+		}
+		return message
+	case dns.TypeAAAA:
+		for _, cname := range cnames {
+			dom := cname + baseDomain
+			record := &dns.A{
+				Hdr: dns.RR_Header{Name: dom, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: 0},
+				A:   net.IPv4(127, 0, 0, 1),
+			}
+			message.Answer = append(message.Answer, record)
+
 		}
 		return message
 	case dns.TypeCNAME:
@@ -130,18 +146,13 @@ func buildResourceRecord(queryType uint16, request *dns.Msg, recordData DNSRecor
 		return message
 	default:
 		log.Printf("defaulting to NXDOMAIN for request\n %s", request.Question[0].String())
-		dom := "ns" + baseDomain
-		record := &dns.SOA{
-			Hdr: dns.RR_Header{Name: dom, Rrtype: dns.TypeSOA, Class: dns.ClassINET, Ttl: 0},
-			Ns:  dom,
-		}
 
 		message.SetRcode(request, dns.RcodeNameError)
-		message.Answer = append(message.Answer, record)
 		return message
 	}
 }
 
+// search the dns records by name and return the corresponding entry
 func findRecordDataByName(search string) (DNSRecord, error) {
 	var emptyRecord DNSRecord
 	emptyRecord.ID = -1
@@ -218,6 +229,7 @@ func loadCSV(filename string) {
 	}
 }
 
+//sanitize the loaded URL
 func sanitizeURL(link string, prefix string) string {
 	shortenedLink := strings.ReplaceAll(link, prefix, "")
 	baseURL, err := url.Parse(shortenedLink)
@@ -228,12 +240,12 @@ func sanitizeURL(link string, prefix string) string {
 	return baseURL.Path
 }
 
+// handle http requests
 func handleHTTP(responseWriter http.ResponseWriter, request *http.Request) {
 	hostname := strings.Split(request.Host, ".")[0]
 	var record DNSRecord
 	var err error
 	path := strings.ReplaceAll(request.URL.Path, "/", "")
-	// path, _ = idna.ToASCII(path)
 	if path != "" {
 		record, err = findRecordDataByName(path)
 		log.Println(record)
@@ -241,6 +253,10 @@ func handleHTTP(responseWriter http.ResponseWriter, request *http.Request) {
 		record, err = findRecordDataByName(hostname)
 	}
 	if err != nil || record.ID == -1 {
+		if !strings.HasSuffix(request.Host, baseDomain[:1]) {
+			http.Redirect(responseWriter, request, "//e-nr.de", 301)
+			return
+		}
 		http.ServeFile(responseWriter, request, "index.html")
 		return
 	}
