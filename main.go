@@ -38,15 +38,16 @@ type DNSRecord struct {
 var DNSRecords []DNSRecord
 
 //global base domain
-var baseDomain = ".e-nr.de."
+var baseDomain = getEnv("BASEDOMAIN", ".e-nr.de.")
 
 //Our main function. This is where it all starts
 func main() {
-	loadCSV("dns.csv")
+	loadCSV(getEnv("CSVFILE", "dns.csv"))
 	dns.HandleFunc(".", handleQuery)
 
 	go func() {
-		server := &dns.Server{Addr: ":8053", Net: "udp"}
+		dnsPort := ":" + getEnv("DNSPORT", "53")
+		server := &dns.Server{Addr: dnsPort, Net: "udp"}
 		err := server.ListenAndServe()
 		if err != nil {
 			log.Fatalf("Could not setup udp listender %s", err.Error())
@@ -55,7 +56,8 @@ func main() {
 
 	go func() {
 		http.HandleFunc("/", handleHTTP)
-		err := http.ListenAndServe(":9090", nil)
+		httpPort := ":" + getEnv("HTTPPORT", "80")
+		err := http.ListenAndServe(httpPort, nil)
 		if err != nil {
 			log.Fatal("ListenAndServe: ", err)
 		}
@@ -261,4 +263,13 @@ func handleHTTP(responseWriter http.ResponseWriter, request *http.Request) {
 		return
 	}
 	http.Redirect(responseWriter, request, record.URL, 301)
+}
+
+// Simple helper function to read an environment or return a default value
+func getEnv(key string, defaultVal string) string {
+	if value, exists := os.LookupEnv(key); exists {
+		return value
+	}
+
+	return defaultVal
 }
