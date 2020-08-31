@@ -21,3 +21,5 @@ Der Dienst liefert A-, AAAA-, CNAME-, URI- und TXT-Records aus. A und AAAA geben
 Servers und die alternativen Namen der E-Nummer aus. CNAME gibt ebenfalls die alternativen Namen aus. Der
 URI-Eintrag gibt den Link zum Wikipedia-Artikel aus. Der TXT-Eintrag enthält den vollen Namen, die
 Beschreibung und die Wikipedia-URL.
+
+Der Dienst ist in Go geschrieben und verwendet hauptsächlich die [DNS Bibliothek von Miekg](https://github.com/miekg/dns).
