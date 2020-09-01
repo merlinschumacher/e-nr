@@ -40,6 +40,9 @@ var DNSRecords []DNSRecord
 //global base domain
 var baseDomain = getEnv("BASEDOMAIN", ".e-nr.de.")
 
+var sHostIP = getEnv("HOSTIP", "127.0.0.1")
+var hostIP = net.ParseIP(sHostIP)
+
 //Our main function. This is where it all starts
 func main() {
 	loadCSV(getEnv("CSVFILE", "dns.csv"))
@@ -109,7 +112,7 @@ func buildResourceRecord(queryType uint16, request *dns.Msg, recordData DNSRecor
 			dom := cname + baseDomain
 			record := &dns.A{
 				Hdr: dns.RR_Header{Name: dom, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: 0},
-				A:   net.IPv4(127, 0, 0, 1),
+				A:   hostIP,
 			}
 			message.Answer = append(message.Answer, record)
 
@@ -120,7 +123,7 @@ func buildResourceRecord(queryType uint16, request *dns.Msg, recordData DNSRecor
 			dom := cname + baseDomain
 			record := &dns.A{
 				Hdr: dns.RR_Header{Name: dom, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: 0},
-				A:   net.IPv4(127, 0, 0, 1),
+				A:   hostIP,
 			}
 			message.Answer = append(message.Answer, record)
 
