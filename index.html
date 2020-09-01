@@ -140,27 +140,70 @@
             border-spacing: 0;
         }
 
-        html {
+        body {
             font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+            line-height: 1.5;
         }
 
         #wrapper {
-            width: 80%;
-            max-width: 600px;
             margin: 0 auto;
             position: relative;
             padding: 1rem;
         }
 
+        @media only screen and (min-width: 600px) {
+            #wrapper {
+                width: 80%;
+                max-width: 600px;
+            }
+        }
+
         h1 {
             font-size: 2rem;
             font-weight: bold;
-            margin-bottom: .75em;
+            margin: 0 0 .75em 0;
         }
 
         h2 {
             font-size: 1.6rem;
             font-weight: bold;
+            margin: 1em 0 .75em 0;
+        }
+
+        h3 {
+            font-size: 1.2rem;
+            font-weight: bold;
+            margin: 1em 0 .75em 0;
+        }
+
+        p {
+            margin: .5em 0;
+        }
+
+        pre {
+            background: #ddd;
+            padding: .5em;
+            border-radius: 5px;
+            border: 1px solid #999;
+            margin: .75em 0;
+            font-family: 'Courier New', Courier, monospace;
+        }
+
+        code {}
+
+        p a,
+        p a:visited {
+            color: black;
+            font-style: italic;
+        }
+
+        aside {
+            margin-top: 1em;
+        }
+
+        aside a {
+            color: black;
+            font-weight: normal;
         }
     </style>
 </head>
@@ -173,29 +216,36 @@
             Mit dieser Seite können Sie einfach die Bedeutung von <a
                 href="https://de.wikipedia.org/wiki/Lebensmittelzusatzstoff" target="_blank">E-Nummern</a> in den
             Inhaltsstoffen von Produkten ermitteln.
+        <p>
             Besuchen Sie zum Beispiel <a href="https://300.e-nr.de" target="_blank">300.e-nr.de</a> um zu erfahren, was
             sich
             hinter E300 verbirgt. Alternativ können Sie auch <a
                 href="https://kaliumacetat.e-nr.de">kaliumacetat.e-nr.de</a>
-            besuchen um Anhand des Namens mehr über den Inhaltsstoff zu erfahren.
+            besuchen um Anhand des Namens mehr über den Inhaltsstoff zu erfahren.</p>
+        <p>
             Alle Links führen direkt zum entsprechenden Artikel der deutschsprachigen Wikipedia.
         </p>
 
         <h3>Spaß für Nerds mit DNS</h3>
         <p>
-            Für technikinteressierte Nutzer stellt diese Seite auch einen DNS-Dienst bereit über den man die Bedeutung
+            Für technikinteressierte Nutzer stellt diese Seite auch einen DNS-Dienst bereit über den man die
+            Bedeutung
             der E-Nummern direkt abrufen kann. Mit dem Kommando dig lassen sich Einträge wie folgt abfragen:
 
-            <code><pre>dig 100.e-nr.de</pre></code>
+            <code><pre>dig 100.e-nr.de @e-nr.de</pre></code>
 
             Der Dienst liefert A-, AAAA-, CNAME-, URI- und TXT-Records aus. A und AAAA geben lediglich die IP des
-            Servers und die alternativen Namen der E-Nummer aus. CNAME gibt ebenfalls die alternativen Namen aus. Der
+            Servers und die alternativen Namen der E-Nummer aus. CNAME gibt ebenfalls die alternativen Namen aus.
+            Der
             URI-Eintrag gibt den Link zum Wikipedia-Artikel aus. Der TXT-Eintrag enthält den vollen Namen, die
             Beschreibung und die Wikipedia-URL.
 
         </p>
-        © Merlin Schumacher – <a href="https://github.com/merlinschumacher/csv-dns" target="_blank">Quellcode auf
-            GitHub</a>
+        <aside>
+            © <a href="https://merlinschumacher.de" target="_blank">Merlin Schumacher</a> – <a
+                href="https://github.com/merlinschumacher/csv-dns" target="_blank">Quellcode auf
+                GitHub</a>
+        </aside>
     </div>
 </body>
 
