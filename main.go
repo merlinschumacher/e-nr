@@ -150,9 +150,14 @@ func buildResourceRecord(queryType uint16, request *dns.Msg, recordData DNSRecor
 		}
 		return message
 	default:
-		log.Printf("defaulting to NXDOMAIN for request\n %s", request.Question[0].String())
+		log.Printf("defaulting to base domain for request\n %s", request.Question[0].String())
 
-		message.SetRcode(request, dns.RcodeNameError)
+		record := &dns.A{
+			Hdr: dns.RR_Header{Name: baseDomain, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: 0},
+			A:   hostIP,
+		}
+		message.Answer = append(message.Answer, record)
+
 		return message
 	}
 }
