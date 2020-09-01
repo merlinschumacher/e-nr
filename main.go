@@ -78,6 +78,7 @@ func handleQuery(writer dns.ResponseWriter, request *dns.Msg) {
 	var message *dns.Msg
 
 	for _, question := range request.Question {
+		log.Println(request.Question)
 		var err error
 		recordData, err = findRecordDataByName(question.Name)
 		if err != nil {
@@ -93,6 +94,7 @@ func handleQuery(writer dns.ResponseWriter, request *dns.Msg) {
 func buildResourceRecord(queryType uint16, request *dns.Msg, recordData DNSRecord) *dns.Msg {
 	message := new(dns.Msg)
 	message.SetReply(request)
+	message.Authoritative = true
 	message.Compress = true
 	strID := strconv.Itoa(recordData.ID)
 	cnames := []string{recordData.Fullname, strID, "e" + strID, "e-" + strID}
@@ -111,7 +113,7 @@ func buildResourceRecord(queryType uint16, request *dns.Msg, recordData DNSRecor
 		for _, cname := range cnames {
 			dom := cname + baseDomain
 			record := &dns.A{
-				Hdr: dns.RR_Header{Name: dom, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: 0},
+				Hdr: dns.RR_Header{Name: dom, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: 3600},
 				A:   hostIP,
 			}
 			message.Answer = append(message.Answer, record)
@@ -122,7 +124,7 @@ func buildResourceRecord(queryType uint16, request *dns.Msg, recordData DNSRecor
 		for _, cname := range cnames {
 			dom := cname + baseDomain
 			record := &dns.A{
-				Hdr: dns.RR_Header{Name: dom, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: 0},
+				Hdr: dns.RR_Header{Name: dom, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: 3600},
 				A:   hostIP,
 			}
 			message.Answer = append(message.Answer, record)
@@ -133,7 +135,7 @@ func buildResourceRecord(queryType uint16, request *dns.Msg, recordData DNSRecor
 		for _, cname := range cnames {
 			dom := cname + baseDomain
 			record := &dns.CNAME{
-				Hdr:    dns.RR_Header{Name: dom, Rrtype: dns.TypeCNAME, Class: dns.ClassINET, Ttl: 0},
+				Hdr:    dns.RR_Header{Name: dom, Rrtype: dns.TypeCNAME, Class: dns.ClassINET, Ttl: 3600},
 				Target: dom,
 			}
 			message.Answer = append(message.Answer, record)
@@ -143,7 +145,7 @@ func buildResourceRecord(queryType uint16, request *dns.Msg, recordData DNSRecor
 		for _, cname := range cnames {
 			dom := cname + baseDomain
 			record := &dns.URI{
-				Hdr:    dns.RR_Header{Name: dom, Rrtype: dns.TypeURI, Class: dns.ClassINET, Ttl: 0},
+				Hdr:    dns.RR_Header{Name: dom, Rrtype: dns.TypeURI, Class: dns.ClassINET, Ttl: 3600},
 				Target: recordData.URL,
 			}
 			message.Answer = append(message.Answer, record)
@@ -151,13 +153,13 @@ func buildResourceRecord(queryType uint16, request *dns.Msg, recordData DNSRecor
 		return message
 	default:
 		log.Printf("defaulting to base domain for request\n %s", request.Question[0].String())
-
+		dom := baseDomain[1:]
 		record := &dns.A{
-			Hdr: dns.RR_Header{Name: baseDomain, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: 0},
+			Hdr: dns.RR_Header{Name: dom, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: 3600},
 			A:   hostIP,
 		}
-		message.Answer = append(message.Answer, record)
-
+		message.Extra = append(message.Answer, record)
+		message.SetRcode(request, dns.RcodeNameError)
 		return message
 	}
 }
@@ -263,10 +265,10 @@ func handleHTTP(responseWriter http.ResponseWriter, request *http.Request) {
 		record, err = findRecordDataByName(hostname)
 	}
 	if err != nil || record.ID == -1 {
-		if !strings.HasSuffix(request.Host, baseDomain[:1]) {
-			http.Redirect(responseWriter, request, "//e-nr.de", 301)
-			return
-		}
+		// if !strings.HasSuffix(request.Host, baseDomain[:1]) {
+		// 	http.Redirect(responseWriter, request, "//e-nr.de", 301)
+		// 	return
+		// }
 		http.ServeFile(responseWriter, request, "index.html")
 		return
 	}
