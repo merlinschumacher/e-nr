@@ -38,7 +38,7 @@ type DNSRecord struct {
 var DNSRecords []DNSRecord
 
 //global base domain
-var baseDomain = getEnv("BASEDOMAIN", ".e-nr.de.")
+var baseDomain = getEnv("BASEDOMAIN", "e-nr.de")
 
 var sHostIP = getEnv("HOSTIP", "127.0.0.1")
 var hostIP = net.ParseIP(sHostIP)
@@ -100,7 +100,7 @@ func buildResourceRecord(queryType uint16, request *dns.Msg, recordData DNSRecor
 	cnames := []string{recordData.Fullname, strID, "e" + strID, "e-" + strID}
 	switch queryType {
 	case dns.TypeTXT:
-		dom := recordData.Fullname + baseDomain
+		dom := recordData.Fullname + "." + baseDomain + "."
 		t := transform.Chain(norm.NFD, runes.Remove(runes.In(unicode.Mn)), norm.NFC)
 		saneDesc, _, _ := transform.String(t, recordData.Description)
 		record := &dns.TXT{
@@ -111,7 +111,7 @@ func buildResourceRecord(queryType uint16, request *dns.Msg, recordData DNSRecor
 		return message
 	case dns.TypeA:
 		for _, cname := range cnames {
-			dom := cname + baseDomain
+			dom := cname + "." + baseDomain + "."
 			record := &dns.A{
 				Hdr: dns.RR_Header{Name: dom, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: 3600},
 				A:   hostIP,
@@ -122,7 +122,7 @@ func buildResourceRecord(queryType uint16, request *dns.Msg, recordData DNSRecor
 		return message
 	case dns.TypeAAAA:
 		for _, cname := range cnames {
-			dom := cname + baseDomain
+			dom := cname + "." + baseDomain + "."
 			record := &dns.A{
 				Hdr: dns.RR_Header{Name: dom, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: 3600},
 				A:   hostIP,
@@ -133,7 +133,7 @@ func buildResourceRecord(queryType uint16, request *dns.Msg, recordData DNSRecor
 		return message
 	case dns.TypeCNAME:
 		for _, cname := range cnames {
-			dom := cname + baseDomain
+			dom := cname + "." + baseDomain + "."
 			record := &dns.CNAME{
 				Hdr:    dns.RR_Header{Name: dom, Rrtype: dns.TypeCNAME, Class: dns.ClassINET, Ttl: 3600},
 				Target: dom,
@@ -143,7 +143,7 @@ func buildResourceRecord(queryType uint16, request *dns.Msg, recordData DNSRecor
 		return message
 	case dns.TypeURI:
 		for _, cname := range cnames {
-			dom := cname + baseDomain
+			dom := cname + "." + baseDomain + "."
 			record := &dns.URI{
 				Hdr:    dns.RR_Header{Name: dom, Rrtype: dns.TypeURI, Class: dns.ClassINET, Ttl: 3600},
 				Target: recordData.URL,
@@ -153,7 +153,7 @@ func buildResourceRecord(queryType uint16, request *dns.Msg, recordData DNSRecor
 		return message
 	default:
 		log.Printf("defaulting to base domain for request\n %s", request.Question[0].String())
-		dom := baseDomain[1:]
+		dom := baseDomain + "."
 		record := &dns.A{
 			Hdr: dns.RR_Header{Name: dom, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: 3600},
 			A:   hostIP,
@@ -265,10 +265,10 @@ func handleHTTP(responseWriter http.ResponseWriter, request *http.Request) {
 		record, err = findRecordDataByName(hostname)
 	}
 	if err != nil || record.ID == -1 {
-		// if !strings.HasSuffix(request.Host, baseDomain[:1]) {
-		// 	http.Redirect(responseWriter, request, "//e-nr.de", 301)
-		// 	return
-		// }
+		if !strings.HasSuffix(request.Host, baseDomain) {
+			http.Redirect(responseWriter, request, "//"+baseDomain, 301)
+			return
+		}
 		http.ServeFile(responseWriter, request, "index.html")
 		return
 	}
