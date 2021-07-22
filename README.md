@@ -11,7 +11,7 @@ besuchen um Anhand des Namens mehr über den Inhaltsstoff zu erfahren.
 Alle Links führen direkt zum entsprechenden Artikel der deutschsprachigen Wikipedia.
 
 ### Spaß für Nerds mit DNS
-Für technikinteressierte Nutzer stellt diese Seite auch einen DNS-Dienst bereit über den man die Bedeutung
+Für technikinteressierte Personen stellt diese Seite auch einen DNS-Dienst bereit über den man die Bedeutung
 der E-Nummern direkt abrufen kann. Mit dem Kommando dig lassen sich Einträge wie folgt abfragen:
 
     dig 100.e-nr.de @e-nr.de
