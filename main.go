@@ -125,7 +125,7 @@ func buildResourceRecord(queryType uint16, request *dns.Msg, recordData DNSRecor
 	case dns.TypeAAAA:
 		for _, cname := range cnames {
 			dom := cname + "." + baseDomain + "."
-			record := &dns.A{
+			record := &dns.AAAA{
 				Hdr: dns.RR_Header{Name: dom, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: 3600},
 				AAAA:   hostIPv6,
 			}
