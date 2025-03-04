@@ -42,6 +42,8 @@ var baseDomain = getEnv("BASEDOMAIN", "e-nr.de")
 
 var sHostIP = getEnv("HOSTIP", "127.0.0.1")
 var hostIP = net.ParseIP(sHostIP)
+var sHostIPv6 = getEnv("HOSTIPV6", "::1")
+var hostIPv6 = net.ParseIP(sHostIPv6)
 
 //Our main function. This is where it all starts
 func main() {
@@ -125,7 +127,7 @@ func buildResourceRecord(queryType uint16, request *dns.Msg, recordData DNSRecor
 			dom := cname + "." + baseDomain + "."
 			record := &dns.A{
 				Hdr: dns.RR_Header{Name: dom, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: 3600},
-				A:   hostIP,
+				AAAA:   hostIPv6,
 			}
 			message.Answer = append(message.Answer, record)
 
